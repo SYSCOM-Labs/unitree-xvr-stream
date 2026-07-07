@@ -1,0 +1,36 @@
+./venv
+venv
+venv/
+.env
+__pycache__/
+config/
+logs/
+*.log
+*.log.*
+*.log.*.*
+*.log.*.*.*
+*.log.*.*.*.*
+*.log.*.*.*.*.*
+*.log.*.*.*.*.*.*
+*.log.*.*.*.*.*.*.*
+*.log.*.*.*.*.*.*.*.*
+cpp/
+
+# Artefactos de compilación Cython (no subir al repo)
+build/
+*.c
+
+*/node_modules/*
+
+# Frontend
+frontend/node_modules/
+frontend/.vite/
+dist/
+
+# Frontend build
+frontend/.vite/
+
+.clock_state
+.device_fingerprint
+.license_activated_at
+license.lic
