@@ -25,7 +25,6 @@ build/
 # Frontend
 frontend/node_modules/
 frontend/.vite/
-dist/
 
 # Frontend build
 frontend/.vite/
