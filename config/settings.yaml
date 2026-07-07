@@ -1,0 +1,16 @@
+device:
+  type: "onvif"
+  onvif_port: 8000
+  camera_source: "go2"
+  camera_index: 2
+  network_interface: "eth0"
+server:
+  host: "0.0.0.0"
+  rtsp_port: 554
+channels:
+- id: '101'
+  stream_path: Streaming/Channels/101
+  name: Canal 1
+- id: '102'
+  stream_path: Streaming/Channels/102
+  name: Canal 2

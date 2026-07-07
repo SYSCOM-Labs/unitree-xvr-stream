@@ -1,0 +1,16 @@
+rtspAddress: :554
+
+# ── HLS (reproducción en el panel web) ────────────────────────────────────────
+# El panel se sirve en http://<ip>:5503 y el video HLS en http://<ip>:8888.
+# Al ser distinto puerto es una petición cross-origin: hlsAllowOrigin evita CORS.
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigin: '*'
+hlsAlwaysRemux: yes
+hlsVariant: mpegts
+
+paths:
+  Streaming/Channels/101:
+    source: publisher
+  Streaming/Channels/102:
+    source: publisher

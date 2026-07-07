@@ -3,7 +3,6 @@ venv
 venv/
 .env
 __pycache__/
-config/
 logs/
 *.log
 *.log.*
