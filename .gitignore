@@ -32,3 +32,5 @@ frontend/.vite/
 .device_fingerprint
 .license_activated_at
 license.lic
+
+app_fastapi.py
