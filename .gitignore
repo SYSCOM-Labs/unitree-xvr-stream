@@ -34,3 +34,12 @@ frontend/.vite/
 license.lic
 
 app_fastapi.py
+compile_project.py
+src/announcer_fastapi.py
+src/clock_guard.py
+src/go2_test_feed.py
+src/licence_utils.py
+src/license_activation.py
+src/license_remote_guard.py
+src/main.py
+src/network_time_guard.py
