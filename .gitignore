@@ -15,7 +15,7 @@ logs/
 *.log.*.*.*.*.*.*.*.*
 cpp/
 
-# Artefactos de compilación Cython (no subir al repo)
+# utils de compilación Cython
 build/
 *.c
 
