@@ -41,6 +41,8 @@ echo ""
 echo -e "    • Servicio y timer de ruta por defecto"
 echo -e "    • Dispatcher de NetworkManager"
 echo -e "    • Script de ruta (/usr/local/bin/go2-default-route.sh)"
+echo -e "    • Servicio y timer de Auto-Updater (go2-repo-updater)"
+echo -e "    • Script del updater (/usr/local/bin/go2-repo-updater.sh)"
     echo -e "    • Servicio de run.py (go2-xvr-stream)"
 echo -e "    • Servicio de MediaMTX (go2-mediamtx)"
 echo -e "    • Paquete ffmpeg"
@@ -65,6 +67,8 @@ echo ""
 SERVICES=(
     "go2-xvr-stream.service"
     "go2-mediamtx.service"
+    "go2-repo-updater.timer"
+    "go2-repo-updater.service"
     "go2-default-route.timer"
     "go2-default-route.service"
 )
@@ -93,6 +97,8 @@ echo -e "${YELLOW}[2/5]${NC} Eliminando archivos de servicios..."
 UNIT_FILES=(
     "/etc/systemd/system/go2-xvr-stream.service"
     "/etc/systemd/system/go2-mediamtx.service"
+    "/etc/systemd/system/go2-repo-updater.service"
+    "/etc/systemd/system/go2-repo-updater.timer"
     "/etc/systemd/system/go2-default-route.service"
     "/etc/systemd/system/go2-default-route.timer"
 )
@@ -119,6 +125,7 @@ echo -e "${YELLOW}[3/5]${NC} Eliminando scripts auxiliares..."
 
 AUX_FILES=(
     "/usr/local/bin/go2-default-route.sh"
+    "/usr/local/bin/go2-repo-updater.sh"
     "/etc/NetworkManager/dispatcher.d/99-go2-default-route"
 )
 
@@ -178,4 +185,6 @@ echo -e "  Puedes volver a ejecutar ${CYAN}sudo ./init.sh${NC} para reinstalar."
 echo ""
 echo -e "  ${GRAY}Nota: El código fuente en ${XVR_DIR} NO fue tocado,${NC}"
 echo -e "  ${GRAY}solo se eliminó la carpeta venv/.${NC}"
+echo -e "  ${GRAY}Las licencias y la carpeta config/ (license.lic, .device_fingerprint,${NC}"
+echo -e "  ${GRAY}.clock_state, .license_activated_at, .env) tampoco se tocaron.${NC}"
 echo ""

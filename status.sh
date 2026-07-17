@@ -31,6 +31,7 @@ SERVICES=(
     "go2-mediamtx.service"
     "go2-default-route.service"
     "go2-default-route.timer"
+    "go2-repo-updater.timer"
 )
 
 SERVICE_LABELS=(
@@ -38,6 +39,7 @@ SERVICE_LABELS=(
     "MediaMTX RTSP"
     "Ruta por defecto (arranque)"
     "Ruta por defecto (timer 5min)"
+    "Auto-Updater GitHub (timer 10min)"
 )
 
 # ==============================================================================
@@ -296,6 +298,30 @@ edit_route_config() {
     read -rp "$(echo -e "${GRAY}  Presiona Enter para volver al menú...${NC}")" _
 }
 
+force_update_check() {
+    echo ""
+    echo -e "  ${BOLD}Buscar actualización en GitHub ahora${NC}"
+    echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
+
+    if ! systemctl list-unit-files "go2-repo-updater.service" &>/dev/null 2>&1; then
+        echo -e "  ${RED}✗ El Auto-Updater no está instalado. Ejecuta init.sh primero.${NC}"
+        read -rp "$(echo -e "${GRAY}  Presiona Enter para volver...${NC}")" _
+        return
+    fi
+
+    echo -e "  ${CYAN}Ejecutando comprobación (git fetch + comparación de commits)...${NC}"
+    echo -e "  ${GRAY}Si hay cambios, se aplicará el pull y se reiniciará el servicio.${NC}"
+    echo ""
+
+    systemctl start go2-repo-updater.service
+
+    echo -e "  ${BOLD}Resultado (últimas líneas de log):${NC}"
+    echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
+    journalctl -u go2-repo-updater.service --no-pager -n 15 2>/dev/null || echo -e "  ${GRAY}Sin logs disponibles${NC}"
+    echo ""
+    read -rp "$(echo -e "${GRAY}  Presiona Enter para volver al menú...${NC}")" _
+}
+
 # ==============================================================================
 # MENÚ PRINCIPAL
 # ==============================================================================
@@ -309,12 +335,14 @@ while true; do
     echo -e "  ${YELLOW}2)${NC} Gestionar: MediaMTX RTSP"
     echo -e "  ${YELLOW}3)${NC} Gestionar: Ruta por defecto (arranque)"
     echo -e "  ${YELLOW}4)${NC} Gestionar: Ruta por defecto (timer)"
+    echo -e "  ${YELLOW}5)${NC} Gestionar: Auto-Updater GitHub (timer)"
     echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
-    echo -e "  ${YELLOW}5)${NC} Iniciar TODOS los servicios"
-    echo -e "  ${YELLOW}6)${NC} Detener TODOS los servicios"
-    echo -e "  ${YELLOW}7)${NC} Reiniciar TODOS los servicios"
+    echo -e "  ${YELLOW}6)${NC} Iniciar TODOS los servicios"
+    echo -e "  ${YELLOW}7)${NC} Detener TODOS los servicios"
+    echo -e "  ${YELLOW}8)${NC} Reiniciar TODOS los servicios"
     echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
-    echo -e "  ${YELLOW}8)${NC} Editar Interfaz y Gateway (Ruta por defecto)"
+    echo -e "  ${YELLOW}9)${NC} Editar Interfaz y Gateway (Ruta por defecto)"
+    echo -e "  ${YELLOW}10)${NC} Buscar actualización en GitHub AHORA"
     echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
     echo -e "  ${YELLOW}0)${NC} Salir"
     echo ""
@@ -326,10 +354,12 @@ while true; do
         2) manage_service "go2-mediamtx.service"        "MediaMTX RTSP"                 ;;
         3) manage_service "go2-default-route.service"   "Ruta por defecto (arranque)"   ;;
         4) manage_service "go2-default-route.timer"     "Ruta por defecto (timer 5min)" ;;
-        5) bulk_action "start"   "Iniciando"   ;;
-        6) bulk_action "stop"    "Deteniendo"  ;;
-        7) bulk_action "restart" "Reiniciando" ;;
-        8) edit_route_config ;;
+        5) manage_service "go2-repo-updater.timer"      "Auto-Updater GitHub (timer 10min)" ;;
+        6) bulk_action "start"   "Iniciando"   ;;
+        7) bulk_action "stop"    "Deteniendo"  ;;
+        8) bulk_action "restart" "Reiniciando" ;;
+        9) edit_route_config ;;
+        10) force_update_check ;;
         0)
             echo ""
             echo -e "  ${CYAN}Hasta luego.${NC}"

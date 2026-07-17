@@ -72,7 +72,7 @@ echo ""
 # ── Crear script de ruta por defecto ──────────────────────────────────────────
 ROUTE_SCRIPT="/usr/local/bin/go2-default-route.sh"
 
-echo -e "${YELLOW}[1/6]${NC} Configurando ruta por defecto persistente..."
+echo -e "${YELLOW}[1/7]${NC} Configurando ruta por defecto persistente..."
 
 cat > "$ROUTE_SCRIPT" <<ROUTEOF
 #!/bin/bash
@@ -175,7 +175,7 @@ while true; do
 done
 
 if [[ -n "$TZ_ZONE" ]]; then
-    echo -e "${YELLOW}[1.5/6]${NC} Aplicando zona horaria ${BOLD}${TZ_ZONE}${NC}..."
+    echo -e "${YELLOW}[1.5/7]${NC} Aplicando zona horaria ${BOLD}${TZ_ZONE}${NC}..."
     
     # 1. Ajustar la zona horaria del sistema
     timedatectl set-timezone "$TZ_ZONE"
@@ -196,7 +196,7 @@ echo ""
 # 2. INSTALAR DEPENDENCIAS DEL SISTEMA
 # ==============================================================================
 
-echo -e "${YELLOW}[2/6]${NC} Instalando ffmpeg y python3.8-venv (sin actualizar paquetes existentes)..."
+echo -e "${YELLOW}[2/7]${NC} Instalando ffmpeg y python3.8-venv (sin actualizar paquetes existentes)..."
 apt install --no-upgrade -y ffmpeg python3.8-venv
 echo -e "${GREEN}  ✔ Paquetes del sistema instalados${NC}"
 echo ""
@@ -205,7 +205,7 @@ echo ""
 # 3. CREAR ENTORNO VIRTUAL DE PYTHON
 # ==============================================================================
 
-echo -e "${YELLOW}[3/6]${NC} Creando entorno virtual en ${XVR_DIR}..."
+echo -e "${YELLOW}[3/7]${NC} Creando entorno virtual en ${XVR_DIR}..."
 
 if [[ ! -d "$XVR_DIR" ]]; then
     echo -e "${RED}[ERROR] No se encontró el directorio ${XVR_DIR}${NC}"
@@ -222,7 +222,7 @@ echo ""
 # 4. INSTALAR DEPENDENCIAS DE PYTHON
 # ==============================================================================
 
-echo -e "${YELLOW}[4/6]${NC} Instalando dependencias de Python (requirements.txt)..."
+echo -e "${YELLOW}[4/7]${NC} Instalando dependencias de Python (requirements.txt)..."
 
 if [[ ! -f "${XVR_DIR}/requirements.txt" ]]; then
     echo -e "${RED}[ERROR] No se encontró ${XVR_DIR}/requirements.txt${NC}"
@@ -241,7 +241,7 @@ echo ""
 # 5. DEMONIO: mediamtx (debe existir antes de go2-xvr-stream)
 # ==============================================================================
 
-echo -e "${YELLOW}[5/6]${NC} Creando servicio systemd para mediamtx..."
+echo -e "${YELLOW}[5/7]${NC} Creando servicio systemd para mediamtx..."
 
 MEDIAMTX_DIR="${XVR_DIR}/config"
 MEDIAMTX_BIN="${MEDIAMTX_DIR}/mediamtx"
@@ -282,7 +282,7 @@ echo ""
 # 6. DEMONIO: unitree-xvr-stream (run.py → app_fastapi compilado)
 # ==============================================================================
 
-echo -e "${YELLOW}[6/6]${NC} Creando servicio systemd para run.py..."
+echo -e "${YELLOW}[6/7]${NC} Creando servicio systemd para run.py..."
 
 cat > /etc/systemd/system/go2-xvr-stream.service <<EOF
 [Unit]
@@ -312,6 +312,110 @@ echo -e "${GREEN}  ✔ Servicio go2-xvr-stream.service habilitado e iniciado${NC
 echo ""
 
 # ==============================================================================
+# 7. DEMONIO EXTRA: AUTO-UPDATER (Monitoreo de actualizaciones en GitHub)
+# ==============================================================================
+
+echo -e "${YELLOW}[7/7]${NC} Creando servicio de actualizaciones automáticas..."
+
+UPDATER_SCRIPT="/usr/local/bin/go2-repo-updater.sh"
+
+UPDATE_BRANCH="main"
+
+cat > "$UPDATER_SCRIPT" <<UPDATEEOF
+#!/bin/bash
+# ------------------------------------------------------------------------------
+# go2-repo-updater.sh — Generado automáticamente por init.sh
+#
+# Busca actualizaciones en GitHub, actualiza el entorno virtual si cambian las
+# dependencias y reinicia el demonio principal para aplicar los cambios.
+#
+# IMPORTANTE: Usa 'git reset --hard' que SOLO afecta archivos versionados.
+# Los archivos de licencia (license.lic, .device_fingerprint, .clock_state,
+# .license_activated_at, .env) y toda la carpeta config/ están en .gitignore,
+# por lo que NO se tocan ni se borran durante la actualización.
+# ------------------------------------------------------------------------------
+
+XVR_DIR="${XVR_DIR}"
+REAL_USER="${REAL_USER}"
+BRANCH="${UPDATE_BRANCH}"
+
+cd "\$XVR_DIR" || exit 1
+
+# 1. Traer los metadatos de GitHub sin modificar el código local aún
+if ! sudo -u "\$REAL_USER" git fetch origin "\$BRANCH" &>/dev/null; then
+    echo "\$(date): No se pudo contactar a GitHub (sin red). Se reintentará luego."
+    exit 0
+fi
+
+# 2. Comparar el commit local contra el de GitHub
+LOCAL=\$(sudo -u "\$REAL_USER" git rev-parse HEAD)
+REMOTE=\$(sudo -u "\$REAL_USER" git rev-parse "origin/\$BRANCH")
+
+if [ "\$LOCAL" != "\$REMOTE" ]; then
+    echo "\$(date): ¡Nueva actualización detectada en GitHub! Aplicando cambios..."
+
+    # Saber si requirements.txt cambió antes de actualizar
+    REQ_CHANGED=\$(sudo -u "\$REAL_USER" git diff --name-only HEAD "origin/\$BRANCH" | grep "requirements.txt" || true)
+
+    # 3. Forzar la actualización local (evita errores si el cliente movió algo sin
+    #    querer). reset --hard NO borra archivos untracked/ignorados (licencias).
+    if ! sudo -u "\$REAL_USER" git reset --hard "origin/\$BRANCH"; then
+        echo "\$(date): ERROR al aplicar git reset --hard. Se aborta la actualización."
+        exit 1
+    fi
+
+    # 4. Si cambiaron las dependencias de Python, actualizarlas en el venv
+    if [ -n "\$REQ_CHANGED" ]; then
+        echo "\$(date): requirements.txt modificado. Actualizando entorno virtual..."
+        sudo -u "\$REAL_USER" bash -c "
+            source '\${XVR_DIR}/venv/bin/activate'
+            pip install -r '\${XVR_DIR}/requirements.txt'
+        "
+    fi
+
+    # 5. Reiniciar el demonio principal para aplicar los cambios de código
+    echo "\$(date): Reiniciando go2-xvr-stream.service..."
+    systemctl restart go2-xvr-stream.service
+    echo "\$(date): Actualización completada (\$LOCAL -> \$REMOTE)."
+fi
+UPDATEEOF
+
+chmod +x "$UPDATER_SCRIPT"
+
+# ── Servicio Systemd para el Updater ──────────────────────────────────────────
+cat > /etc/systemd/system/go2-repo-updater.service <<EOF
+[Unit]
+Description=Go2 — Ejecutor de Auto-Updater de Git
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=${UPDATER_SCRIPT}
+EOF
+
+# ── Timer Systemd para ejecutarlo periódicamente ──────────────────────────────
+cat > /etc/systemd/system/go2-repo-updater.timer <<EOF
+[Unit]
+Description=Go2 — Temporizador para buscar actualizaciones cada 30 min
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# ── Habilitar e iniciar el actualizador automático ────────────────────────────
+systemctl daemon-reload
+systemctl enable --now go2-repo-updater.timer
+
+echo -e "${GREEN}  ✔ Auto-Updater configurado (revisa cada 30 minutos, rama '${UPDATE_BRANCH}')${NC}"
+echo ""
+
+# ==============================================================================
 # RESUMEN FINAL
 # ==============================================================================
 
@@ -330,12 +434,18 @@ echo -e "    ${GREEN}●${NC} go2-default-route.service  — Ruta por defecto al
 echo -e "    ${GREEN}●${NC} go2-default-route.timer    — Reaplicar ruta cada 5 min"
 echo -e "    ${GREEN}●${NC} go2-xvr-stream.service     — run.py (siempre encendido)"
 echo -e "    ${GREEN}●${NC} go2-mediamtx.service       — MediaMTX RTSP (siempre encendido)"
+echo -e "    ${GREEN}●${NC} go2-repo-updater.timer     — Auto-actualización desde GitHub (cada 30 min)"
 echo ""
 echo -e "  ${BOLD}Comandos útiles${NC}"
 echo -e "    Ver estado:    ${CYAN}sudo systemctl status go2-xvr-stream${NC}"
 echo -e "    Ver logs:      ${CYAN}sudo journalctl -u go2-xvr-stream -f${NC}"
 echo -e "    Reiniciar:     ${CYAN}sudo systemctl restart go2-xvr-stream${NC}"
 echo -e "    Parar todo:    ${CYAN}sudo systemctl stop go2-xvr-stream go2-mediamtx${NC}"
+echo ""
+echo -e "  ${BOLD}Actualizaciones automáticas${NC}"
+echo -e "    Forzar ahora:  ${CYAN}sudo systemctl start go2-repo-updater.service${NC}"
+echo -e "    Ver logs:      ${CYAN}sudo journalctl -u go2-repo-updater -f${NC}"
+echo -e "    Ver timer:     ${CYAN}sudo systemctl list-timers go2-repo-updater${NC}"
 echo ""
 echo -e "  ${BOLD}Reconfigurar red${NC}"
 echo -e "    Editar:        ${CYAN}sudo nano ${ROUTE_SCRIPT}${NC}"
