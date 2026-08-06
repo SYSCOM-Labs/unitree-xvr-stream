@@ -29,7 +29,9 @@ Esta guía detalla el proceso completo para solicitar su licencia, descargar el 
 
 ## 1. Proceso de licenciamiento y obtención de software
 
-El software **Unitree XVR Stream** se distribuye de forma gratuita pero exclusiva para dispositivos adquiridos a través de SYSCOM. El flujo consta de 3 etapas autogestionadas desde el portal de SYSCOM.
+El software **Unitree XVR Stream** se distribuye exclusivamente para dispositivos adquiridos a través de SYSCOM. El flujo se realiza a traves del portal de SYSCOM: 
+
+https://unitree.syscom.mx/wizard
 
 ### Etapa 1: Solicitud de acceso a licencia
 
