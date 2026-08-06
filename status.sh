@@ -39,8 +39,11 @@ SERVICE_LABELS=(
     "MediaMTX RTSP"
     "Ruta por defecto (arranque)"
     "Ruta por defecto (timer 5min)"
-    "Auto-Updater GitHub (timer 10min)"
+    "Auto-Updater GitHub (timer 30min)"
 )
+
+SETTINGS_FILE="${XVR_DIR}/config/settings.yaml"
+REPAIR_SCRIPT="${XVR_DIR}/scripts/go2-repair.sh"
 
 # ==============================================================================
 # FUNCIONES
@@ -129,6 +132,20 @@ show_dashboard() {
         echo -e "  Gateway configurado:   ${GREEN}${gw:-?}${NC}"
     else
         echo -e "  ${YELLOW}  Ruta no configurada (ejecutar init.sh primero)${NC}"
+    fi
+
+    if [[ -f "$SETTINGS_FILE" ]]; then
+        local cfg_host cfg_iface
+        cfg_host=$(grep -E '^[[:space:]]+host:' "$SETTINGS_FILE" 2>/dev/null | head -n1 | cut -d':' -f2- | tr -d " \"'")
+        cfg_iface=$(grep -E '^[[:space:]]+network_interface:' "$SETTINGS_FILE" 2>/dev/null | head -n1 | cut -d':' -f2- | tr -d " \"'")
+        if [[ -z "$cfg_host" || "$cfg_host" == "0.0.0.0" ]]; then
+            echo -e "  IP de transmisión:     ${RED}${cfg_host:-sin configurar}${NC} (revisar panel web)"
+        else
+            echo -e "  IP de transmisión:     ${GREEN}${cfg_host}${NC}"
+        fi
+        echo -e "  Interfaz de cámara:    ${GREEN}${cfg_iface:-usb}${NC}"
+    else
+        echo -e "  ${RED}  Falta config/settings.yaml (usar opción 11 para repararlo)${NC}"
     fi
 
     local default_route
@@ -322,6 +339,53 @@ force_update_check() {
     read -rp "$(echo -e "${GRAY}  Presiona Enter para volver al menú...${NC}")" _
 }
 
+repair_project() {
+    echo ""
+    echo -e "  ${BOLD}Verificar / reparar permisos y configuración${NC}"
+    echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
+
+    if [[ ! -f "$REPAIR_SCRIPT" ]]; then
+        echo -e "  ${RED}✗ No se encontró ${REPAIR_SCRIPT}${NC}"
+        echo -e "  ${GRAY}  El equipo tiene una versión anterior del proyecto.${NC}"
+        read -rp "$(echo -e "${GRAY}  Presiona Enter para volver...${NC}")" _
+        return
+    fi
+
+    XVR_DIR="$XVR_DIR" REAL_USER="$REAL_USER" bash "$REPAIR_SCRIPT"
+
+    echo ""
+    echo -e "  ${BOLD}Estado de la configuración frente a git${NC}"
+    echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
+
+    # config/settings.yaml debe estar IGNORADO por git: si apareciera como
+    # versionado, el `git reset --hard` del updater volvería a sobrescribirlo.
+    if sudo -u "$REAL_USER" git -C "$XVR_DIR" check-ignore -q config/settings.yaml 2>/dev/null; then
+        echo -e "  config/settings.yaml   ${GREEN}● ignorado por git (protegido)${NC}"
+    else
+        echo -e "  config/settings.yaml   ${RED}✗ NO ignorado por git (se perderá al actualizar)${NC}"
+    fi
+
+    local dirty
+    dirty=$(sudo -u "$REAL_USER" git -C "$XVR_DIR" status --short 2>/dev/null || true)
+    if [[ -n "$dirty" ]]; then
+        echo -e "  ${YELLOW}Archivos versionados modificados localmente${NC} (se revertirán al actualizar):"
+        while IFS= read -r line; do
+            echo -e "    ${GRAY}${line}${NC}"
+        done <<< "$dirty"
+    else
+        echo -e "  Árbol de trabajo       ${GREEN}● limpio${NC}"
+    fi
+
+    if [[ -d /var/backups/go2-xvr ]]; then
+        local last_backup
+        last_backup=$(ls -1dt /var/backups/go2-xvr/*/ 2>/dev/null | head -n1)
+        echo -e "  Último respaldo        ${CYAN}${last_backup:-ninguno}${NC}"
+    fi
+
+    echo ""
+    read -rp "$(echo -e "${GRAY}  Presiona Enter para volver al menú...${NC}")" _
+}
+
 # ==============================================================================
 # MENÚ PRINCIPAL
 # ==============================================================================
@@ -343,6 +407,7 @@ while true; do
     echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
     echo -e "  ${YELLOW}9)${NC} Editar Interfaz y Gateway (Ruta por defecto)"
     echo -e "  ${YELLOW}10)${NC} Buscar actualización en GitHub AHORA"
+    echo -e "  ${YELLOW}11)${NC} Verificar / reparar permisos y configuración"
     echo -e "  ${GRAY}──────────────────────────────────────────────────────${NC}"
     echo -e "  ${YELLOW}0)${NC} Salir"
     echo ""
@@ -354,12 +419,13 @@ while true; do
         2) manage_service "go2-mediamtx.service"        "MediaMTX RTSP"                 ;;
         3) manage_service "go2-default-route.service"   "Ruta por defecto (arranque)"   ;;
         4) manage_service "go2-default-route.timer"     "Ruta por defecto (timer 5min)" ;;
-        5) manage_service "go2-repo-updater.timer"      "Auto-Updater GitHub (timer 10min)" ;;
+        5) manage_service "go2-repo-updater.timer"      "Auto-Updater GitHub (timer 30min)" ;;
         6) bulk_action "start"   "Iniciando"   ;;
         7) bulk_action "stop"    "Deteniendo"  ;;
         8) bulk_action "restart" "Reiniciando" ;;
         9) edit_route_config ;;
         10) force_update_check ;;
+        11) repair_project ;;
         0)
             echo ""
             echo -e "  ${CYAN}Hasta luego.${NC}"

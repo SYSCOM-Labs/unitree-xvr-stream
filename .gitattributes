@@ -1,0 +1,9 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+config/mediamtx binary
+bin/go2_video_test binary
+bin/go2_video_client binary
+*.so binary

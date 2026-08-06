@@ -30,6 +30,11 @@ frontend/.vite/
 .license_activated_at
 license.lic
 
+config/*
+!config/mediamtx
+!config/settings.example.yaml
+!config/mediamtx.example.yml
+
 app_fastapi.py
 compile_project.py
 src/announcer_fastapi.py

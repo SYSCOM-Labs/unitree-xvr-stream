@@ -214,6 +214,13 @@ if [[ ! -d "$XVR_DIR" ]]; then
 fi
 
 cd "$XVR_DIR"
+
+# Materializar config/settings.yaml desde la plantilla y asegurar permisos antes
+# de seguir. El archivo real no está versionado, así que en un clon limpio no
+# existe todavía.
+XVR_DIR="$XVR_DIR" REAL_USER="$REAL_USER" bash "${XVR_DIR}/scripts/go2-repair.sh"
+echo ""
+
 sudo -u "$REAL_USER" python3 -m venv venv
 echo -e "${GREEN}  ✔ Entorno virtual creado en ${XVR_DIR}/venv${NC}"
 echo ""
@@ -317,102 +324,14 @@ echo ""
 
 echo -e "${YELLOW}[7/7]${NC} Creando servicio de actualizaciones automáticas..."
 
-UPDATER_SCRIPT="/usr/local/bin/go2-repo-updater.sh"
-
 UPDATE_BRANCH="main"
 
-cat > "$UPDATER_SCRIPT" <<UPDATEEOF
-#!/bin/bash
-# ------------------------------------------------------------------------------
-# go2-repo-updater.sh — Generado automáticamente por init.sh
-#
-# Busca actualizaciones en GitHub, actualiza el entorno virtual si cambian las
-# dependencias y reinicia el demonio principal para aplicar los cambios.
-#
-# IMPORTANTE: Usa 'git reset --hard' que SOLO afecta archivos versionados.
-# Los archivos de licencia (license.lic, .device_fingerprint, .clock_state,
-# .license_activated_at, .env) y toda la carpeta config/ están en .gitignore,
-# por lo que NO se tocan ni se borran durante la actualización.
-# ------------------------------------------------------------------------------
+# La lógica del updater vive en scripts/go2-repo-updater.sh (versionada), y en
+# /usr/local/bin queda solo un wrapper. Así, cualquier mejora al updater llega a
+# los equipos por la propia actualización de GitHub.
+XVR_DIR="$XVR_DIR" REAL_USER="$REAL_USER" BRANCH="$UPDATE_BRANCH" \
+    bash "${XVR_DIR}/scripts/install-updater.sh"
 
-XVR_DIR="${XVR_DIR}"
-REAL_USER="${REAL_USER}"
-BRANCH="${UPDATE_BRANCH}"
-
-cd "\$XVR_DIR" || exit 1
-
-# 1. Traer los metadatos de GitHub sin modificar el código local aún
-if ! sudo -u "\$REAL_USER" git fetch origin "\$BRANCH" &>/dev/null; then
-    echo "\$(date): No se pudo contactar a GitHub (sin red). Se reintentará luego."
-    exit 0
-fi
-
-# 2. Comparar el commit local contra el de GitHub
-LOCAL=\$(sudo -u "\$REAL_USER" git rev-parse HEAD)
-REMOTE=\$(sudo -u "\$REAL_USER" git rev-parse "origin/\$BRANCH")
-
-if [ "\$LOCAL" != "\$REMOTE" ]; then
-    echo "\$(date): ¡Nueva actualización detectada en GitHub! Aplicando cambios..."
-
-    # Saber si requirements.txt cambió antes de actualizar
-    REQ_CHANGED=\$(sudo -u "\$REAL_USER" git diff --name-only HEAD "origin/\$BRANCH" | grep "requirements.txt" || true)
-
-    # 3. Forzar la actualización local (evita errores si el cliente movió algo sin
-    #    querer). reset --hard NO borra archivos untracked/ignorados (licencias).
-    if ! sudo -u "\$REAL_USER" git reset --hard "origin/\$BRANCH"; then
-        echo "\$(date): ERROR al aplicar git reset --hard. Se aborta la actualización."
-        exit 1
-    fi
-
-    # 4. Si cambiaron las dependencias de Python, actualizarlas en el venv
-    if [ -n "\$REQ_CHANGED" ]; then
-        echo "\$(date): requirements.txt modificado. Actualizando entorno virtual..."
-        sudo -u "\$REAL_USER" bash -c "
-            source '\${XVR_DIR}/venv/bin/activate'
-            pip install -r '\${XVR_DIR}/requirements.txt'
-        "
-    fi
-
-    # 5. Reiniciar el demonio principal para aplicar los cambios de código
-    echo "\$(date): Reiniciando go2-xvr-stream.service..."
-    systemctl restart go2-xvr-stream.service
-    echo "\$(date): Actualización completada (\$LOCAL -> \$REMOTE)."
-fi
-UPDATEEOF
-
-chmod +x "$UPDATER_SCRIPT"
-
-# ── Servicio Systemd para el Updater ──────────────────────────────────────────
-cat > /etc/systemd/system/go2-repo-updater.service <<EOF
-[Unit]
-Description=Go2 — Ejecutor de Auto-Updater de Git
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=${UPDATER_SCRIPT}
-EOF
-
-# ── Timer Systemd para ejecutarlo periódicamente ──────────────────────────────
-cat > /etc/systemd/system/go2-repo-updater.timer <<EOF
-[Unit]
-Description=Go2 — Temporizador para buscar actualizaciones cada 30 min
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=30min
-AccuracySec=1min
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# ── Habilitar e iniciar el actualizador automático ────────────────────────────
-systemctl daemon-reload
-systemctl enable --now go2-repo-updater.timer
-
-echo -e "${GREEN}  ✔ Auto-Updater configurado (revisa cada 30 minutos, rama '${UPDATE_BRANCH}')${NC}"
 echo ""
 
 # ==============================================================================
@@ -446,6 +365,12 @@ echo -e "  ${BOLD}Actualizaciones automáticas${NC}"
 echo -e "    Forzar ahora:  ${CYAN}sudo systemctl start go2-repo-updater.service${NC}"
 echo -e "    Ver logs:      ${CYAN}sudo journalctl -u go2-repo-updater -f${NC}"
 echo -e "    Ver timer:     ${CYAN}sudo systemctl list-timers go2-repo-updater${NC}"
+echo -e "    Respaldos:     ${CYAN}/var/backups/go2-xvr/${NC} (config antes de cada update)"
+echo ""
+echo -e "  ${BOLD}Configuración del cliente${NC}"
+echo -e "    Archivo:       ${CYAN}${XVR_DIR}/config/settings.yaml${NC} (NO versionado)"
+echo -e "    Plantilla:     ${CYAN}${XVR_DIR}/config/settings.example.yaml${NC}"
+echo -e "    Reparar:       ${CYAN}sudo bash ${XVR_DIR}/scripts/go2-repair.sh${NC}"
 echo ""
 echo -e "  ${BOLD}Reconfigurar red${NC}"
 echo -e "    Editar:        ${CYAN}sudo nano ${ROUTE_SCRIPT}${NC}"
