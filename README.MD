@@ -193,8 +193,14 @@ El script funciona como una consola de administración centralizada en el robot.
 
 #### D. Acciones disponibles en el menú
 
-* **Gestión individual:** Iniciar, detener, reiniciar cada servicio por separado; ver logs recientes o seguimiento en vivo.
-* **Acciones masivas:** Iniciar, detener o reiniciar todos los servicios del sistema de una sola vez.
+* **Gestión Individual (Opciones 1-4):** Permite controlar cada servicio de forma aislada:
+  * **Iniciar / Detener / Reiniciar:** Controla el ciclo de vida del servicio.
+  * **Ver logs:** Muestra las últimas 20 líneas de registro del servicio mediante `journalctl`.
+  * **Seguimiento en vivo:** Realiza un seguimiento interactivo de la salida estándar del servicio en tiempo real (equivalente a `journalctl -f`).
+* **Acciones Masivas (Opciones 5-7):** Inicia, detiene o reinicia todos los servicios del ecosistema del stream de manera secuencial y simultánea.
+* **Editar Interfaz y Gateway (Opción 9):** Reescribe `IFACE`/`GW` en `/usr/local/bin/go2-default-route.sh` y reaplica la ruta.
+* **Buscar actualización AHORA (Opción 10):** Lanza `go2-repo-updater.service` y muestra el resultado del log.
+* **Verificar / reparar permisos y configuración (Opción 11):** Ejecuta `scripts/go2-repair.sh` (crea la config faltante, reaplica `chmod +x` y la propiedad de los archivos) y confirma que `config/settings.yaml` está ignorado por git, que el árbol de trabajo está limpio y cuál fue el último respaldo.
 
 ---
 
